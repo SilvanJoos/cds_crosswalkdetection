@@ -1,0 +1,18 @@
+# Ignore the data directory (as requested)
+data/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore virtual environments
+.venv/
+
+# Ignore VS Code workspace settings
+.vscode/
+
+# Ignore model checkpoints (these files are usually very large)
+checkpoints/
+
+# Ignore image output directories (if img_2 contains generated/large datasets)
+img_2/

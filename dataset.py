@@ -185,8 +185,8 @@ class CrosswalkDataset(Dataset):
 def create_dataloaders(
     train_dir: str,
     test_dir: str,
-    batch_size: int = 32,
-    num_workers: int = 0,
+    batch_size: int = 128,
+    num_workers: int = 8,
     seed: int = 42
 ) -> Tuple[DataLoader, DataLoader]:
     """

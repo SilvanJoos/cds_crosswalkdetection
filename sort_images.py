@@ -8,12 +8,10 @@ from concurrent.futures import ProcessPoolExecutor
 # ==========================================
 # CONFIGURATION
 # ==========================================
-SOURCE_DIR = "C:\\Users\\silva\\Documents\\DeepLearning\\data\\asconalocarno\\n"      # Folder containing the 100k images
-DEST_DIR = "C:\\Users\\silva\\Documents\\DeepLearning\\data\\asconalocarno\\n_2"     # Folder to move the rejected images to
-THRESHOLD_PERCENT = 75                 # If > 80% of the image is blue/green/black, move it
-
-# Create the destination directory if it doesn't exist
-os.makedirs(DEST_DIR, exist_ok=True)
+# Point this to your main 'data' folder that contains all the city folders
+BASE_DATA_DIR = "C:\\Users\\silva\\Documents\\cds_crosswalkdetection\\data"  
+IGNORE_FOLDERS = {"train", "test", "val"}      # Folders to skip at the base level
+THRESHOLD_PERCENT = 75                         # If > 75% of the image is blue/green/black, move it
 
 def is_overwhelmingly_bg_b(image_path):
     """
@@ -30,22 +28,21 @@ def is_overwhelmingly_bg_b(image_path):
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         
         # 1. Define range for BLACK (Low Value/Brightness)
-        # Hue and Saturation don't matter, we just look for dark pixels
         lower_black = np.array([0, 0, 0])
         upper_black = np.array([180, 255, 45])
         mask_black = cv2.inRange(hsv, lower_black, upper_black)
         
         # 2. Define range for GREEN (Foliage/Grass)
-        # Hue in OpenCV is 0-179. Green is roughly 35 to 85.
         lower_green = np.array([35, 40, 40])
         upper_green = np.array([85, 255, 255])
         mask_green = cv2.inRange(hsv, lower_green, upper_green)
         
         # 3. Define range for BLUE (Water/Sky)
-        # Blue is roughly 90 to 130.
         lower_blue = np.array([90, 40, 40])
         upper_blue = np.array([130, 255, 255])
         mask_blue = cv2.inRange(hsv, lower_blue, upper_blue)
+        
+        # 4. Define range for WHITE
         mask_white = cv2.inRange(hsv, np.array([0, 0, 200]), np.array([180, 30, 255]))
         
         # Combine all masks using bitwise OR
@@ -62,31 +59,57 @@ def is_overwhelmingly_bg_b(image_path):
         print(f"Error processing {image_path.name}: {e}")
         return False
 
-def process_image(image_path):
+def process_image(args):
     """Worker function to process a single image and move it if necessary."""
+    image_path, dest_dir = args  # Unpack the arguments
+    
     if is_overwhelmingly_bg_b(image_path):
-        dest_path = Path(DEST_DIR) / image_path.name
+        dest_path = dest_dir / image_path.name
         try:
             shutil.move(str(image_path), str(dest_path))
-            return f"Moved: {image_path.name}"
+            return f"Moved: {image_path.name} to {dest_dir.parent.name}/n_2"
         except Exception as e:
             return f"Failed to move {image_path.name}: {e}"
     return None
 
 def main():
-    # Gather all image paths (modify extensions if you have .png or others)
-    source_path = Path(SOURCE_DIR)
-    image_paths = [p for p in source_path.iterdir() if p.suffix.lower() in ['.jpg', '.jpeg', '.png']]
+    base_path = Path(BASE_DATA_DIR)
     
-    total_images = len(image_paths)
-    print(f"Found {total_images} images. Starting processing...")
+    # We will build a list of tasks. Each task is a tuple: (image_path, destination_directory)
+    tasks = []
+    
+    # 1. Iterate through all items in the base data directory
+    for city_dir in base_path.iterdir():
+        # Ensure it's a directory and not in our ignore list
+        if city_dir.is_dir() and city_dir.name.lower() not in IGNORE_FOLDERS:
+            
+            n_folder = city_dir / "n"
+            
+            # 2. Check if the "n" folder exists inside this city folder
+            if n_folder.exists() and n_folder.is_dir():
+                
+                # Define and create the target "n_2" directory for this specific city
+                dest_dir = city_dir / "n_2"
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                
+                # 3. Gather all images from this "n" folder
+                for img_path in n_folder.iterdir():
+                    if img_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
+                        tasks.append((img_path, dest_dir))
+    
+    total_images = len(tasks)
+    if total_images == 0:
+        print("No images found in any 'n' directories. Please check your BASE_DATA_DIR path.")
+        return
+
+    print(f"Found {total_images} images across all city 'n' folders. Starting processing...")
     
     moved_count = 0
     
-    # Process images in parallel to speed up the 100k iteration
+    # Process images in parallel
     with ProcessPoolExecutor() as executor:
-        # Map the worker function to all image paths
-        results = executor.map(process_image, image_paths)
+        # Map the worker function to all our tasks
+        results = executor.map(process_image, tasks)
         
         for i, result in enumerate(results):
             if result:
@@ -97,7 +120,7 @@ def main():
                 print(f"Processed {i + 1}/{total_images} images... Moved {moved_count} so far.")
 
     print("==========================================")
-    print(f"Done! Filtered out {moved_count} images out of {total_images}.")
+    print(f"Done! Filtered out {moved_count} images out of {total_images} total.")
 
 if __name__ == '__main__':
     main()

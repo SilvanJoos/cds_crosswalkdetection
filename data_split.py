@@ -136,7 +136,7 @@ def print_summary(total_images: int, class_stats: dict) -> None:
 if __name__ == "__main__":
     # ========== CONFIGURATION ==========
     # Path to your source data with 'y' and 'n' subdirectories
-    SOURCE_DATA_DIR = "./data/asconalocarno"  # Update this to your data location
+    SOURCE_DATA_DIR = "./data/working"  # Update this to your data location
     
     # Output directory where train/test split will be created
     OUTPUT_DIR = "./data"

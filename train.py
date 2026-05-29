@@ -1,336 +1,193 @@
-"""
-04_train.py - Training Script for Crosswalk Classifier
-
-This script handles:
-  - Model initialization with proper seed setting
-  - Training loop with loss tracking
-  - Validation on test set during training
-  - Checkpoint saving
-  - GPU/CPU device handling
-  - Early stopping to prevent overfitting
-
-Training strategy:
-  - Use BCE loss for binary classification
-  - Adam optimizer (adaptive learning rates)
-  - Learning rate scheduling with ReduceLROnPlateau
-  - Track both loss and accuracy metrics
-  - Save best model based on validation accuracy
-"""
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from pathlib import Path
 import json
-from typing import Dict, Tuple, Optional
 import sys
-from datetime import datetime
+import numpy as np
 
-# Import from local modules
+# NEW IMPORTS FOR METRICS AND VISUALIZATION
+from sklearn.metrics import f1_score, confusion_matrix, precision_recall_curve, average_precision_score
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from dataset import create_dataloaders
 from model import create_model, set_seed
 
-
 class Trainer:
-    """Handles model training, validation, and checkpoint management."""
-    
-    def __init__(
-        self,
-        model: nn.Module,
-        train_loader: DataLoader,
-        test_loader: DataLoader,
-        device: torch.device,
-        dropout_rate: float = 0.5,
-        seed: int = 42,
-        checkpoint_dir: str = "./checkpoints"
-    ):
-        """
-        Initialize the Trainer.
-        
-        Args:
-            model: PyTorch model to train
-            train_loader: Training data loader
-            test_loader: Test/validation data loader
-            device: Device to train on (cpu or cuda)
-            dropout_rate: Dropout rate for model
-            seed: Random seed for reproducibility
-            checkpoint_dir: Directory to save model checkpoints
-        """
+    def __init__(self, model, train_loader, test_loader, device, checkpoint_dir="./checkpoints"):
         self.model = model
         self.train_loader = train_loader
         self.test_loader = test_loader
         self.device = device
-        self.seed = seed
-        
-        # Create checkpoint directory
         self.checkpoint_dir = Path(checkpoint_dir)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         
-        # Loss function with class weights to handle severe imbalance
-        # Dataset: 313 crosswalk vs 18,887 no-crosswalk (ratio 1:60)
-        # Weights inversely proportional to class frequency
-        class_weights = torch.tensor([60.0, 1.0]).to(device)  # Adjust if rebalanced!
+        # Softened weights to balance Precision and Recall
+        class_weights = torch.tensor([15.0, 1.0]).to(device)
         self.criterion = nn.CrossEntropyLoss(weight=class_weights)
-        print(f"✓ Weighted loss enabled (class weights: {class_weights.cpu().tolist()})")
         
-        # ==========================================
-        # 🔧 FIX 1: DIFFERENTIAL LEARNING RATES
-        # ==========================================
-        # Optimizer: Adam using parameter groups from model.py
-        # This keeps the backbone LR low (1e-5) and the custom head higher (1e-4)
-        self.optimizer = optim.Adam(
-            self.model.get_parameter_groups(),
-            weight_decay=1e-5  # L2 regularization
-        )
+        self.optimizer = optim.Adam(self.model.get_parameter_groups(), weight_decay=1e-4)
         
-        # Learning rate scheduler: reduce LR when validation plateaus
+        # Monitor MAX F1-score for learning rate reduction
         self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer,
-            mode='max',  # Maximize accuracy
-            factor=0.5,  # Reduce LR by 50%
-            patience=3,  # Wait 3 epochs before reducing
+            self.optimizer, mode='max', factor=0.5, patience=2
         )
-        
-        # Training history
-        self.history = {
-            "train_loss": [],
-            "train_accuracy": [],
-            "test_loss": [],
-            "test_accuracy": []
-        }
-        
-        print(f"\n🎯 Trainer initialized:")
-        print(f"   Device: {device}")
-        print(f"   Optimizer: Adam (with differential parameter groups)")
-        print(f"   Loss function: CrossEntropyLoss")
+        self.history = {"train_loss": [], "val_loss": [], "val_f1": []}
     
-    def train_epoch(self) -> Tuple[float, float]:
-        """Train for one epoch."""
-        self.model.train()  # Set to training mode
-        
+    def train_epoch(self):
+        self.model.train()
         total_loss = 0.0
-        correct = 0
-        total = 0
         
         for batch_idx, (images, labels) in enumerate(self.train_loader):
-            # Move data to device
-            images = images.to(self.device)
-            labels = labels.to(self.device)
+            images, labels = images.to(self.device), labels.to(self.device)
             
-            # Forward pass
-            self.optimizer.zero_grad()  # Clear gradients
+            self.optimizer.zero_grad()
             logits = self.model(images)
             loss = self.criterion(logits, labels)
             
-            # Backward pass
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
-            
-            # Track metrics
             total_loss += loss.item()
-            _, predicted = torch.max(logits.data, 1)
-            correct += (predicted == labels).sum().item()
-            total += labels.size(0)
             
-            # Print progress every N batches
+            # --- THE FANCY COMMANDLINE UPDATES ---
+            # Prints progress 5 times per epoch
             if (batch_idx + 1) % max(1, len(self.train_loader) // 5) == 0:
-                print(f"   Batch {batch_idx + 1}/{len(self.train_loader)} | "
-                      f"Loss: {loss.item():.4f}")
-        
-        avg_loss = total_loss / len(self.train_loader)
-        accuracy = 100 * correct / total
-        
-        return avg_loss, accuracy
-    
-    def validate(self) -> Tuple[float, float]:
-        """Validate on test set."""
-        self.model.eval()  # Set to evaluation mode
-        
-        total_loss = 0.0
-        correct = 0
-        total = 0
-        
-        with torch.no_grad():  # Don't compute gradients
-            for images, labels in self.test_loader:
-                # Move data to device
-                images = images.to(self.device)
-                labels = labels.to(self.device)
+                print(f"   Batch {batch_idx + 1:03d}/{len(self.train_loader):03d} | "
+                      f"Current Loss: {loss.item():.4f}")
                 
-                # Forward pass
+        return total_loss / len(self.train_loader)
+    
+    def validate(self):
+        self.model.eval()
+        total_loss = 0.0
+        
+        all_preds = []
+        all_labels = []
+        all_probs = [] # Keep track of probabilities for the PR curve
+        
+        with torch.no_grad():
+            for images, labels in self.test_loader:
+                images, labels = images.to(self.device), labels.to(self.device)
                 logits = self.model(images)
                 loss = self.criterion(logits, labels)
-                
-                # Track metrics
                 total_loss += loss.item()
+                
+                # Get probabilities using Softmax
+                probs = torch.softmax(logits, dim=1)
+                
                 _, predicted = torch.max(logits.data, 1)
-                correct += (predicted == labels).sum().item()
-                total += labels.size(0)
-        
+                
+                all_preds.extend(predicted.cpu().numpy())
+                all_labels.extend(labels.cpu().numpy())
+                # Store probability of the positive class (Class 0: crosswalk)
+                all_probs.extend(probs[:, 0].cpu().numpy())
+                
         avg_loss = total_loss / len(self.test_loader)
-        accuracy = 100 * correct / total
         
-        return avg_loss, accuracy
+        # Calculate Macro F1 Score (balances performance across both majority and minority classes)
+        val_f1 = f1_score(all_labels, all_preds, average='macro')
+        
+        return avg_loss, val_f1, all_labels, all_preds, all_probs
     
-    def train(
-        self,
-        num_epochs: int = 20,
-        early_stopping_patience: int = 5
-    ) -> Dict:
-        """Full training loop with early stopping."""
-        print(f"\n{'='*60}")
-        print(f"🚀 Starting Training ({num_epochs} epochs)")
-        print(f"{'='*60}\n")
-        
-        best_test_acc = 0.0
+    def train(self, num_epochs=20, patience=5):
+        best_f1 = 0.0
         best_epoch = 0
         patience_counter = 0
         
+        best_labels, best_preds, best_probs = None, None, None
+        
         for epoch in range(num_epochs):
-            print(f"Epoch {epoch + 1}/{num_epochs}")
+            train_loss = self.train_epoch()
+            val_loss, val_f1, labels, preds, probs = self.validate()
             
-            # Train
-            train_loss, train_acc = self.train_epoch()
+            print(f"Epoch {epoch+1}/{num_epochs} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Val F1-Score: {val_f1:.4f}")
             
-            # Validate
-            test_loss, test_acc = self.validate()
+            # Step the scheduler based on F1-Score
+            self.scheduler.step(val_f1)
             
-            # Store history
             self.history["train_loss"].append(train_loss)
-            self.history["train_accuracy"].append(train_acc)
-            self.history["test_loss"].append(test_loss)
-            self.history["test_accuracy"].append(test_acc)
+            self.history["val_loss"].append(val_loss)
+            self.history["val_f1"].append(val_f1)
             
-            # Print metrics
-            print(f"  Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}%")
-            print(f"  Test Loss:  {test_loss:.4f} | Test Acc:  {test_acc:.2f}%")
-            print()
-            
-            # Learning rate scheduling
-            self.scheduler.step(test_acc)
-            
-            # Early stopping check
-            if test_acc > best_test_acc:
-                best_test_acc = test_acc
+            # Early stopping based on F1-SCORE, not accuracy
+            if val_f1 > best_f1:
+                best_f1 = val_f1
                 best_epoch = epoch
                 patience_counter = 0
+                best_labels, best_preds, best_probs = labels, preds, probs
                 
-                # Save best model
-                self._save_checkpoint(epoch, test_acc)
-                print(f"  ✓ Best model saved (Val Acc: {test_acc:.2f}%)\n")
+                torch.save(self.model.state_dict(), self.checkpoint_dir / "best_model.pth")
+                print(f"  ✓ Best model saved! (F1: {best_f1:.4f})")
             else:
                 patience_counter += 1
-                if patience_counter >= early_stopping_patience:
-                    print(f"\n⏸️  Early stopping triggered at epoch {epoch + 1}")
-                    print(f"  Best validation accuracy: {best_test_acc:.2f}% (epoch {best_epoch + 1})")
-                    
-                    # ==========================================
-                    # 🔧 FIX 2: RESTORE THE BEST MODEL
-                    # ==========================================
-                    print("  Restoring the best version of the model from disk...")
-                    best_model_path = self.checkpoint_dir / f"model_epoch{best_epoch+1}_acc{best_test_acc:.2f}.pth"
-                    if best_model_path.exists():
-                        checkpoint = torch.load(best_model_path)
-                        self.model.load_state_dict(checkpoint['model_state_dict'])
+                if patience_counter >= patience:
+                    print(f"\n⏸️ Early stopping at epoch {epoch + 1}")
+                    self.model.load_state_dict(torch.load(self.checkpoint_dir / "best_model.pth"))
                     break
-        
-        print(f"\n{'='*60}")
-        print(f"✅ Training Complete!")
-        print(f"   Best Accuracy: {best_test_acc:.2f}% (epoch {best_epoch + 1})")
-        print(f"{'='*60}\n")
+                    
+        # Generate Visualizations at the end of training
+        print("\n📊 Generating Evaluation Visualizations...")
+        self.plot_evaluation_metrics(best_labels, best_preds, best_probs)
         
         return self.history
-    
-    def _save_checkpoint(self, epoch: int, accuracy: float) -> None:
-        """Save model checkpoint."""
-        checkpoint_path = self.checkpoint_dir / f"model_epoch{epoch+1}_acc{accuracy:.2f}.pth"
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': self.model.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'accuracy': accuracy
-        }, checkpoint_path)
-    
+
+    def plot_evaluation_metrics(self, labels, preds, probs):
+        """Creates the visualizations that the judges will actually care about."""
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+        
+        # 1. Confusion Matrix
+        cm = confusion_matrix(labels, preds)
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax1,
+                    xticklabels=['Crosswalk (0)', 'No Crosswalk (1)'],
+                    yticklabels=['Crosswalk (0)', 'No Crosswalk (1)'])
+        ax1.set_title('Confusion Matrix')
+        ax1.set_ylabel('Actual Label')
+        ax1.set_xlabel('Predicted Label')
+        
+        # 2. Precision-Recall Curve (Crucial for imbalanced data)
+        # Note: Scikit-learn expects the positive class to be '1'. 
+        # In your dataset, '0' is crosswalk. So we invert labels for the PR curve.
+        inverted_labels = [1 if l == 0 else 0 for l in labels]
+        
+        precision, recall, _ = precision_recall_curve(inverted_labels, probs)
+        pr_auc = average_precision_score(inverted_labels, probs)
+        
+        ax2.plot(recall, precision, color='darkorange', lw=2, 
+                 label=f'PR curve (area = {pr_auc:.3f})')
+        ax2.set_xlim([0.0, 1.0])
+        ax2.set_ylim([0.0, 1.05])
+        ax2.set_xlabel('Recall (Found all Crosswalks?)')
+        ax2.set_ylabel('Precision (Are they actually Crosswalks?)')
+        ax2.set_title('Precision-Recall Curve for Crosswalks')
+        ax2.legend(loc="lower left")
+        ax2.grid(True)
+        
+        plt.tight_layout()
+        plt.savefig(self.checkpoint_dir / 'evaluation_metrics.png')
+        print(f"✓ Saved visualizations to {self.checkpoint_dir / 'evaluation_metrics.png'}")
     def save_history(self, filepath: str = "training_history.json") -> None:
-        """Save training history to JSON file."""
         with open(filepath, 'w') as f:
             json.dump(self.history, f, indent=2)
         print(f"✓ Training history saved to {filepath}")
 
 
 def main():
-    """Main training function."""
-    
-    # ========== CONFIGURATION ==========
     BATCH_SIZE = 32
-    DROPOUT_RATE = 0.5
+    DROPOUT_RATE = 0.4
     NUM_EPOCHS = 20
     SEED = 42
-    EARLY_STOPPING_PATIENCE = 5
     
-    TRAIN_DIR = "./data/train"
-    TEST_DIR = "./data/test"
-    CHECKPOINT_DIR = "./checkpoints"
-    # ===================================
-    
-    # Set seed for reproducibility
-    set_seed(SEED)
-    
-    # Determine device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"\n🖥️  Device: {device}")
-    if torch.cuda.is_available():
-        print(f"   GPU: {torch.cuda.get_device_name(0)}")
-        print(f"   CUDA: {torch.version.cuda}")
+    train_loader, test_loader = create_dataloaders("./data/train", "./data/test", batch_size=BATCH_SIZE)
     
-    try:
-        # Create dataloaders
-        print(f"\n📊 Loading data...")
-        train_loader, test_loader = create_dataloaders(
-            train_dir=TRAIN_DIR,
-            test_dir=TEST_DIR,
-            batch_size=BATCH_SIZE,
-            seed=SEED
-        )
-        
-        # Create model
-        print(f"\n🏗️  Building model...")
-        model = create_model(
-            device=device,
-            dropout_rate=DROPOUT_RATE,
-            pretrained=True,
-            freeze_backbone=True, # Ensure your backbone is frozen per the differential rates logic
-            seed=SEED
-        )
-        
-        # Create trainer and train
-        trainer = Trainer(
-            model=model,
-            train_loader=train_loader,
-            test_loader=test_loader,
-            device=device,
-            dropout_rate=DROPOUT_RATE,
-            seed=SEED,
-            checkpoint_dir=CHECKPOINT_DIR
-        )
-        
-        history = trainer.train(
-            num_epochs=NUM_EPOCHS,
-            early_stopping_patience=EARLY_STOPPING_PATIENCE
-        )
-        
-        # Save history
-        trainer.save_history("training_history.json")
-        
-    except FileNotFoundError as e:
-        print(f"❌ Error: {e}")
-        print(f"   Make sure you've run 01_data_split.py first to create train/test directories.")
-        sys.exit(1)
-    except Exception as e:
-        print(f"❌ Unexpected error: {e}")
-        raise
-
+    model = create_model(device, dropout_rate=DROPOUT_RATE, pretrained=True, freeze_backbone=False)
+    
+    trainer = Trainer(model, train_loader, test_loader, device)
+    trainer.train(num_epochs=NUM_EPOCHS)
+    trainer.save_history("training_history.json")
 
 if __name__ == "__main__":
     main()

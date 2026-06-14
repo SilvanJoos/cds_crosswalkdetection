@@ -269,8 +269,13 @@ def stratified_resample(
 def main():
     """Main rebalancing function."""
     
-    TRAIN_DIR = "./data/train"
-    TEST_DIR = "./data/test"
+    # Setup project root for local paths
+    import sys
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    sys.path.append(str(PROJECT_ROOT))
+    
+    TRAIN_DIR = str(PROJECT_ROOT / "data" / "train")
+    TEST_DIR = str(PROJECT_ROOT / "data" / "test")
     
     # Analyze current imbalance
     stats = analyze_imbalance(TRAIN_DIR, TEST_DIR)
@@ -299,15 +304,18 @@ def main():
     choice = input("Choose rebalancing strategy (1-4, default=1): ").strip() or "1"
     
     if choice == "2":
-        stratified_resample(TRAIN_DIR, TEST_DIR, target_ratio=3.0)
-        print(f"✅ Rebalanced data ready in ./data_rebalanced_stratified/")
+        output_path = str(PROJECT_ROOT / "data_rebalanced_stratified")
+        stratified_resample(TRAIN_DIR, TEST_DIR, target_ratio=3.0, output_dir=output_path)
+        print(f"✅ Rebalanced data ready in {output_path}/")
         print(f"   Update 04_train.py to use this directory!\n")
     elif choice == "3":
-        oversample_minority(TRAIN_DIR, target_ratio=1.0)
-        print(f"✅ Oversampled data ready in ./data_rebalanced_oversample/\n")
+        output_path = str(PROJECT_ROOT / "data_rebalanced_oversample")
+        oversample_minority(TRAIN_DIR, target_ratio=1.0, output_dir=output_path)
+        print(f"✅ Oversampled data ready in {output_path}/\n")
     elif choice == "4":
-        undersample_majority(TRAIN_DIR, target_ratio=3.0)
-        print(f"✅ Undersampled data ready in ./data_rebalanced_undersample/\n")
+        output_path = str(PROJECT_ROOT / "data_rebalanced_undersample")
+        undersample_majority(TRAIN_DIR, target_ratio=3.0, output_dir=output_path)
+        print(f"✅ Undersampled data ready in {output_path}/\n")
     else:
         print(f"✓ Using weighted loss in training (no rebalancing applied)")
         print(f"  This is the recommended approach!\n")

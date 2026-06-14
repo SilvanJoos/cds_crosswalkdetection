@@ -27,7 +27,7 @@ poetry --version
 
 ### Step 1: Create Virtual Environment and Install Dependencies
 ```powershell
-cd C:\Users\silva\Documents\DeepLearning
+cd cds_crosswalkdetection
 
 # Install all dependencies from pyproject.toml
 poetry install
@@ -45,31 +45,31 @@ This will:
 poetry shell
 
 # Now run Python commands directly
-python 00_rebalance_dataset.py
-python 04_train.py
-python 05_evaluate.py
+python rebalance_dataset.py
+python train.py
+python evaluate.py
 ```
 
 **Option B: Run directly without activating** (recommended)
 ```powershell
-poetry run python 00_rebalance_dataset.py
-poetry run python 04_train.py
-poetry run python 05_evaluate.py
+poetry run python rebalance_dataset.py
+poetry run python train.py
+poetry run python evaluate.py
 ```
 
 ## Your Project Files
 
 ```
-DeepLearning/
+cds_crosswalkdetection/
 ├── pyproject.toml          ← Poetry configuration (with all dependencies)
 ├── poetry.lock             ← Auto-generated, version-locked dependencies
-├── 00_rebalance_dataset.py ← Handle class imbalance
-├── 01_data_split.py        ← Split train/test (ALREADY RUN ✓)
-├── 02_model.py             ← Model architecture
-├── 03_dataset.py           ← Custom dataset with augmentation
-├── 04_train.py             ← Training script (uses weighted loss)
-├── 05_evaluate.py          ← Evaluation & visualizations
-├── 06_hyperparameter_tuning.py ← Optuna optimization
+├── rebalance_dataset.py    ← Handle class imbalance
+├── data_split.py           ← Split train/test (ALREADY RUN ✓)
+├── model.py                ← Model architecture
+├── dataset.py              ← Custom dataset with augmentation
+├── train.py                ← Training script (uses weighted loss)
+├── evaluate.py             ← Evaluation & visualizations
+├── hyperparameter_tuning.py← Optuna optimization
 └── README.md               ← Full documentation
 ```
 

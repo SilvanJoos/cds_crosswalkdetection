@@ -8,9 +8,13 @@ from concurrent.futures import ProcessPoolExecutor
 # ==========================================
 # CONFIGURATION
 # ==========================================
+import sys
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+
 # Point this to your main 'data' folder that contains all the city folders
-BASE_DATA_DIR = "C:\\Users\\silva\\Documents\\cds_crosswalkdetection\\data"  
-IGNORE_FOLDERS = {"train", "test", "val"}      # Folders to skip at the base level
+BASE_DATA_DIR = str(PROJECT_ROOT / "data")  
+IGNORE_FOLDERS = {"train", "test", "val", "meta", "working"}      # Folders to skip at the base level
 THRESHOLD_PERCENT = 75                         # If > 75% of the image is blue/green/black, move it
 
 def is_overwhelmingly_bg_b(image_path):

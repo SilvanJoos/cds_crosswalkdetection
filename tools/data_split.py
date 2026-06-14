@@ -134,12 +134,17 @@ def print_summary(total_images: int, class_stats: dict) -> None:
 
 
 if __name__ == "__main__":
+    # Setup project root for local paths
+    import sys
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    sys.path.append(str(PROJECT_ROOT))
+    
     # ========== CONFIGURATION ==========
     # Path to your source data with 'y' and 'n' subdirectories
-    SOURCE_DATA_DIR = "./data/working"  # Update this to your data location
+    SOURCE_DATA_DIR = str(PROJECT_ROOT / "data" / "working")  # Update this to your data location
     
     # Output directory where train/test split will be created
-    OUTPUT_DIR = "./data"
+    OUTPUT_DIR = str(PROJECT_ROOT / "data")
     
     # Train/test split ratio (80% train, 20% test)
     TRAIN_TEST_RATIO = 0.8

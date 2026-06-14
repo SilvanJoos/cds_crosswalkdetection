@@ -186,8 +186,13 @@ def create_dataloaders(
 
 
 if __name__ == "__main__":
+    import sys
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    sys.path.append(str(PROJECT_ROOT))
+    
     # Change this to your real dataset path!
-    test_root = Path("./data/asconalocarno")
+    test_root = PROJECT_ROOT / "data" / "asconalocarno"
+    save_aug_dir = PROJECT_ROOT / "img_2"
     
     if test_root.exists():
         print(f"\n📁 Loading dataset from: {test_root}\n")
@@ -197,7 +202,7 @@ if __name__ == "__main__":
             root_dir=str(test_root),
             augment=True, 
             target_size=(224, 224),
-            save_aug_dir="img_2"
+            save_aug_dir=str(save_aug_dir)
         )
         
         target_count = 300
@@ -217,7 +222,7 @@ if __name__ == "__main__":
                 if (i + 1) % 50 == 0:
                     print(f"  Processed {i + 1}/{limit} images...")
                     
-            print(f"\n✓ Done! Check the 'img_2' folder to see all {limit} images.")
+            print(f"\n✓ Done! Check the '{save_aug_dir.name}' folder to see all {limit} images.")
         else:
             print("⚠️  Dataset is empty. Make sure images are in y/ and n/ subdirectories.")
     else:

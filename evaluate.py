@@ -111,17 +111,44 @@ class ModelEvaluator:
         
         print(f"\n{'='*60}\n")
     
-    def plot_confusion_matrix(self, metrics: Dict, save_path: str = "confusion_matrix.png") -> None:
+    def plot_confusion_matrix(self, metrics: Dict, all_labels: np.ndarray = None, all_logits: np.ndarray = None, save_path: str = "confusion_matrix.png") -> None:
         cm = np.array(metrics['confusion_matrix'])
-        plt.figure(figsize=(8, 6))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                   xticklabels=self.class_names, yticklabels=self.class_names)
-        plt.title('Confusion Matrix - F1 Optimized Model')
-        plt.ylabel('True Label')
-        plt.xlabel('Predicted Label')
-        plt.tight_layout()
+        if all_labels is not None and all_logits is not None:
+            fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+            
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                       xticklabels=self.class_names, yticklabels=self.class_names, ax=axes[0])
+            axes[0].set_title('Confusion Matrix - F1 Optimized Model')
+            axes[0].set_ylabel('True Label')
+            axes[0].set_xlabel('Predicted Label')
+            
+            try:
+                from sklearn.metrics import precision_recall_curve, auc
+                probabilities = torch.softmax(torch.tensor(all_logits), dim=1).numpy()
+                precision, recall, _ = precision_recall_curve(all_labels, probabilities[:, 1])
+                pr_auc = auc(recall, precision)
+                
+                axes[1].plot(recall, precision, color='b', lw=2, label=f'PR curve (AUC = {pr_auc:.3f})')
+                axes[1].set_xlabel('Recall')
+                axes[1].set_ylabel('Precision')
+                axes[1].set_title('Precision-Recall Curve')
+                axes[1].legend(loc="lower left")
+                axes[1].grid(True, alpha=0.3)
+            except Exception as e:
+                print(f"Could not plot PR curve: {e}")
+                
+            plt.tight_layout()
+        else:
+            plt.figure(figsize=(8, 6))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                       xticklabels=self.class_names, yticklabels=self.class_names)
+            plt.title('Confusion Matrix - F1 Optimized Model')
+            plt.ylabel('True Label')
+            plt.xlabel('Predicted Label')
+            plt.tight_layout()
+            
         plt.savefig(save_path, dpi=300)
-        print(f"✓ Confusion matrix saved to {save_path}")
+        print(f"✓ Evaluation plots saved to {save_path}")
         plt.close()
     
     def plot_training_curves(self, history_path: str = "training_history.json", save_path: str = "training_curves.png") -> None:
@@ -207,7 +234,7 @@ def main():
         evaluator.print_report(metrics)
         
         print(f"\n🎨 Generating visualizations in {eval_dir}...")
-        evaluator.plot_confusion_matrix(metrics, save_path=str(eval_dir / "confusion_matrix.png"))
+        evaluator.plot_confusion_matrix(metrics, all_labels=all_labels, all_logits=all_logits, save_path=str(eval_dir / "confusion_matrix.png"))
         
         history_path = Path("training_history.json")
         if history_path.exists():

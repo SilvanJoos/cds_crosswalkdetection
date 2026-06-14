@@ -11,6 +11,10 @@ import torch
 from torch.utils.data import DataLoader
 import sys
 
+# Setup project root for local imports
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+
 # Import from local modules
 from dataset import CrosswalkDataset
 from model import create_model, set_seed
@@ -216,8 +220,12 @@ def scan_dataset(model, device, dataset, verified_set, batch_size=32):
 
 def main():
     SEED = 42
-    QUEUE_FILE = "review_queue.json"
-    VERIFIED_FILE = "verified_labels.json"
+    
+    META_DIR = PROJECT_ROOT / "data" / "meta"
+    META_DIR.mkdir(parents=True, exist_ok=True)
+    QUEUE_FILE = META_DIR / "review_queue.json"
+    VERIFIED_FILE = META_DIR / "verified_labels.json"
+    
     set_seed(SEED)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
@@ -230,23 +238,23 @@ def main():
     
     # Load or Create Queue
     if os.path.exists(QUEUE_FILE):
-        print(f"📂 Found existing {QUEUE_FILE}. Resuming previous session...")
+        print(f"📂 Found existing {QUEUE_FILE.name}. Resuming previous session...")
         with open(QUEUE_FILE, 'r') as f:
             review_queue = json.load(f)
     else:
         print("🔍 Scanning entire dataset for mismatches (This may take a minute)...")
         
         model = create_model(device=device, dropout_rate=0.4, freeze_backbone=False, seed=SEED)
-        checkpoint_dir = Path("./checkpoints")
+        checkpoint_dir = PROJECT_ROOT / "checkpoints"
         checkpoints = sorted(checkpoint_dir.glob("*.pth"))
         if not checkpoints:
-            print("❌ No checkpoints found in ./checkpoints/")
+            print(f"❌ No checkpoints found in {checkpoint_dir}")
             sys.exit(1)
             
         model.load_state_dict(torch.load(str(checkpoints[-1]), map_location=device))
         
-        train_dataset = CrosswalkDataset(root_dir="./data/train", augment=False, seed=SEED)
-        test_dataset = CrosswalkDataset(root_dir="./data/test", augment=False, seed=SEED)
+        train_dataset = CrosswalkDataset(root_dir=str(PROJECT_ROOT / "data" / "train"), augment=False, seed=SEED)
+        test_dataset = CrosswalkDataset(root_dir=str(PROJECT_ROOT / "data" / "test"), augment=False, seed=SEED)
         
         print(f"Scanning Train Set ({len(train_dataset)} images)...")
         train_mismatches = scan_dataset(model, device, train_dataset, verified_set)

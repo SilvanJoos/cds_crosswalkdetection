@@ -2,15 +2,19 @@ import shutil
 import os
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+import sys
 
 # ==========================================
 # CONFIGURATION
 # ==========================================
-BASE_DATA_DIR = "C:\\Users\\silva\\Documents\\cds_crosswalkdetection\\data"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+
+BASE_DATA_DIR = str(PROJECT_ROOT / "data")
 WORKING_DIR = os.path.join(BASE_DATA_DIR, "working")
 
 # Folders to skip at the base level (add "working" so it doesn't process itself)
-IGNORE_FOLDERS = {"train", "test", "val", "working"}  
+IGNORE_FOLDERS = {"train", "test", "val", "working", "meta"}  
 
 # Target directories
 TARGET_Y = Path(WORKING_DIR) / "y"

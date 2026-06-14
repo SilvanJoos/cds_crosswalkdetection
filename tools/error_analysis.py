@@ -3,13 +3,17 @@ import csv
 from pathlib import Path
 import sys
 
+# Setup project root for local imports
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+
 # Import from your local modules
 from dataset import create_dataloaders, CrosswalkDataset
 from model import create_model, set_seed
 
 def main():
     # ========== CONFIGURATION ==========
-    TEST_DIR = "./data/test"
+    TEST_DIR = PROJECT_ROOT / "data" / "test"
     BATCH_SIZE = 32
     SEED = 42
     # ===================================
@@ -22,22 +26,22 @@ def main():
         # 1. Load the Test Dataset (We need the raw dataset object to get the file paths)
         print("📊 Loading test data...")
         test_dataset = CrosswalkDataset(
-            root_dir=TEST_DIR,
+            root_dir=str(TEST_DIR),
             augment=False,
             seed=SEED
         )
         
         # 2. Get the test loader (crucially, shuffle=False)
-        _, test_loader = create_dataloaders("./data/train", TEST_DIR, batch_size=BATCH_SIZE, seed=SEED)
+        _, test_loader = create_dataloaders(str(PROJECT_ROOT / "data" / "train"), str(TEST_DIR), batch_size=BATCH_SIZE, seed=SEED)
         
         # 3. Find and load the best model
         print("\n🏗️  Building and loading model...")
         model = create_model(device=device, dropout_rate=0.4, freeze_backbone=False, seed=SEED)
         
-        checkpoint_dir = Path("./checkpoints")
+        checkpoint_dir = PROJECT_ROOT / "checkpoints"
         checkpoints = sorted(checkpoint_dir.glob("*.pth"))
         if not checkpoints:
-            print("❌ No checkpoints found in ./checkpoints/")
+            print(f"❌ No checkpoints found in {checkpoint_dir}")
             sys.exit(1)
             
         best_checkpoint = str(checkpoints[-1])
@@ -65,7 +69,8 @@ def main():
                 all_probs.extend(probs.cpu().numpy())
                 
         # 5. Analyze Errors and Write to CSV
-        output_csv = "error_analysis.csv"
+        output_csv = PROJECT_ROOT / "eval" / "error_analysis.csv"
+        output_csv.parent.mkdir(parents=True, exist_ok=True)
         image_paths = test_dataset.images  # Matches exactly because shuffle=False
         
         error_count = 0

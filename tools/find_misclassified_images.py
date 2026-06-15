@@ -69,7 +69,7 @@ def main():
                 all_probs.extend(probs.cpu().numpy())
                 
         # 5. Analyze Errors and Write to CSV
-        output_csv = PROJECT_ROOT / "eval" / "error_analysis.csv"
+        output_csv = PROJECT_ROOT / "eval" / "misclassified_images.csv"
         output_csv.parent.mkdir(parents=True, exist_ok=True)
         image_paths = test_dataset.images  # Matches exactly because shuffle=False
         

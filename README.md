@@ -32,7 +32,7 @@ This project uses **Poetry** to manage dependencies. For detailed environment se
 The project includes several utilities to prepare, clean, and analyze the dataset before and after training. These are all located in the `tools/` directory:
 
 - `tools/sort_images.py` & `tools/copy_img.py`: Utilities to organize and manage raw image files.
-- `tools/dataset_cleaner.py`: Removes invalid, corrupted, or mislabeled images from the dataset.
+- `tools/reclassify_images_ui.py`: A UI tool that lets the user manually review and reclassify wrongly classified images (Human-in-the-Loop).
 - `tools/rebalance_dataset.py`: Handles class imbalances in the training data to prevent biased models.
 - `tools/data_split.py`: Splits the data into robust training, validation, and testing sets.
 - `tools/augment.py`: Contains specific data augmentation logic for PyTorch dataloaders.
@@ -100,12 +100,12 @@ This script generates extensive metrics and plots saved directly to the `eval/` 
 - `training_curves.png`: Loss and F1-score progression over epochs.
 - `evaluation_metrics.json`: Final numerical metrics (F1, Precision, Recall, Accuracy).
 
-### Error Analysis (`tools/error_analysis.py`)
+### Find Misclassified Images (`tools/find_misclassified_images.py`)
 To deeply understand where the model struggles:
 ```bash
-python tools/error_analysis.py
+python tools/find_misclassified_images.py
 ```
-This generates an `eval/error_analysis.csv` to review false positives and false negatives, which interfaces with manual verification pipelines (`data/meta/review_queue.json`, `data/meta/verified_labels.json`).
+This generates an `eval/misclassified_images.csv` to review false positives and false negatives, which interfaces with manual verification pipelines (`data/meta/review_queue.json`, `data/meta/verified_labels.json`).
 
 ---
 
@@ -127,11 +127,37 @@ The best configuration is automatically saved to `best_optuna_params.json`.
 
 ---
 
+## 📈 Expected Results & Model Performance
+
+The current baseline model (`best_model_v1_098.pth`) achieves outstanding performance on the test set, demonstrating high reliability in identifying crosswalks despite the class imbalance.
+
+> **Note on Hyperparameter Tuning:** The current model could perform even better, but lengthy hyperparameter tuning resulted in the PC crashing many times. All tuning was calculated locally with great speed and efficiency due to wanting to test personal hardware instead of FHGR hardware. In the future, this will be done on FHGR servers to avoid these crashes caused by Windows and driver issues.
+
+**Key Performance Metrics:**
+- **Accuracy:** 99.92%
+- **F1-Score (Macro):** 99.57%
+- **Precision:** 99.62%
+- **Recall:** 99.52%
+- **ROC AUC:** 99.99%
+
+**Per-Class Accuracy:**
+- **Crosswalk (0):** 99.08%
+- **No-Crosswalk (1):** 99.97%
+
+### Visual Diagnostics
+
+<div align="center">
+  <img src="eval/best_model_v1_098.pth/confusion_matrix.png" alt="Confusion Matrix" width="45%">
+  <img src="eval/best_model_v1_098.pth/training_curves.png" alt="Training Curves" width="45%">
+</div>
+
+---
+
 ## 🐛 Troubleshooting
 
 - **GPU Not Available:** Ensure you have the CUDA 11.8 toolkit installed. Check compatibility with `python -c "import torch; print(torch.cuda.is_available())"`.
 - **Out of Memory (OOM):** Reduce the batch size in your scripts or close background applications consuming VRAM.
-- **Poor F1-Score:** Consider re-running `tools/rebalance_dataset.py` or tuning the class weights in `train.py`. Use `tools/error_analysis.py` to check for systematically mislabeled data.
+- **Poor F1-Score:** Consider re-running `tools/rebalance_dataset.py` or tuning the class weights in `train.py`. Use `tools/find_misclassified_images.py` to check for systematically mislabeled data.
 
 ---
 
@@ -139,3 +165,21 @@ The best configuration is automatically saved to `best_optuna_params.json`.
 
 - **AI Assistance:** This project was heavily vibe coded and assisted through AI.
 - **Dataset Collection:** The dataset was gathered using [swissimage_annotator](https://github.com/sudoale/swissimage_annotator) and in cooperation with Fabian Nadler, Frederic Kurbel, Joel Hallauer, Lars Cools, Mike Obrietan, and Neel Frei.
+
+---
+
+## 🤝 Contributing
+
+Contributions to improve the dataset, model architecture, or data processing tools are always welcome!
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+Distributed under the MIT License.

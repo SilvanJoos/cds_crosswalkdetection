@@ -1,40 +1,3 @@
-"""
-00_rebalance_dataset.py - Address Class Imbalance
-
-Dataset Analysis:
-  - Crosswalk (y): 313 images
-  - No-Crosswalk (n): 18,887 images
-  - Imbalance Ratio: 1:60 (SEVERE)
-
-Why this matters:
-  A naive model that always predicts "no-crosswalk" would be 98% accurate!
-  We need to handle this to train a model that actually learns to detect crosswalks.
-
-Solutions to Class Imbalance:
-
-1. WEIGHTED LOSS (Recommended - Used in training)
-   └─ Increase penalty for misclassifying minority class
-   └─ No data modification needed
-   └─ Already implemented in 04_train.py
-
-2. OVERSAMPLING (Optional - Duplicate minority class)
-   └─ Duplicate crosswalk images to balance dataset
-   └─ Increases training time, can lead to overfitting
-   └─ Useful if you have few samples
-
-3. UNDERSAMPLING (Optional - Remove majority class)
-   └─ Randomly remove no-crosswalk images
-   └─ Faster training, loses data
-   └─ Use if data is abundant
-
-4. STRATIFIED RESAMPLING (Recommended + Balanced)
-   └─ Balance to intermediate ratio (1:3 or 1:5)
-   └─ Prevents extreme imbalance without losing too much data
-   └─ Good for this use case
-
-This script offers all options so you can experiment and report in your hackathon paper!
-"""
-
 import os
 import shutil
 import random
@@ -283,7 +246,7 @@ def main():
     
     print(f"\n🎯 RECOMMENDED APPROACH:")
     print(f"{'='*70}")
-    print(f"\nUse WEIGHTED LOSS (already in 04_train.py) +")
+    print(f"\nUse WEIGHTED LOSS (already in train.py) +")
     print(f"Optional STRATIFIED RESAMPLING for better training\n")
     
     print(f"Weighted loss is simple and effective:")
@@ -307,7 +270,6 @@ def main():
         output_path = str(PROJECT_ROOT / "data_rebalanced_stratified")
         stratified_resample(TRAIN_DIR, TEST_DIR, target_ratio=3.0, output_dir=output_path)
         print(f"✅ Rebalanced data ready in {output_path}/")
-        print(f"   Update 04_train.py to use this directory!\n")
     elif choice == "3":
         output_path = str(PROJECT_ROOT / "data_rebalanced_oversample")
         oversample_minority(TRAIN_DIR, target_ratio=1.0, output_dir=output_path)
@@ -319,11 +281,6 @@ def main():
     else:
         print(f"✓ Using weighted loss in training (no rebalancing applied)")
         print(f"  This is the recommended approach!\n")
-    
-    print(f"📖 For your hackathon report, explain:")
-    print(f"   - Why the dataset was imbalanced")
-    print(f"   - How you addressed it (weighted loss / resampling)")
-    print(f"   - How it affected model performance\n")
 
 
 if __name__ == "__main__":

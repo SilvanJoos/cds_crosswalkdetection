@@ -34,7 +34,7 @@ The project includes several utilities to prepare, clean, and analyze the datase
 - `tools/sort_images.py` & `tools/copy_img.py`: Utilities to organize and manage raw image files.
 - `tools/reclassify_images_ui.py`: A UI tool that lets the user manually review and reclassify wrongly classified images (Human-in-the-Loop).
 - `tools/rebalance_dataset.py`: Handles class imbalances in the training data to prevent biased models.
-- `tools/data_split.py`: Splits the data into robust training, validation, and testing sets.
+- `tools/data_split.py`: Splits the data into robust training (70%), validation (15%), and testing (15%) sets.
 - `tools/augment.py`: Contains specific data augmentation logic for PyTorch dataloaders.
 
 To prepare your dataset, place your images in the `data/` directory and run the relevant scripts (e.g., `python tools/data_split.py`).
@@ -129,26 +129,26 @@ The best configuration is automatically saved to `best_optuna_params.json`.
 
 ## 📈 Expected Results & Model Performance
 
-The current baseline model (`best_model_v1_098.pth`) achieves outstanding performance on the test set, demonstrating high reliability in identifying crosswalks despite the class imbalance.
+The current baseline model (`model_F1_09877`) achieves outstanding performance on the test set, demonstrating high reliability in identifying crosswalks despite the class imbalance.
 
 > **Note on Hyperparameter Tuning:** The current model could perform even better, but lengthy hyperparameter tuning resulted in the PC crashing many times. All tuning was calculated locally with great speed and efficiency due to wanting to test personal hardware instead of FHGR hardware. In the future, this will be done on FHGR servers to avoid these crashes caused by Windows and driver issues.
 
 **Key Performance Metrics:**
-- **Accuracy:** 99.92%
-- **F1-Score (Macro):** 99.57%
-- **Precision:** 99.62%
-- **Recall:** 99.52%
-- **ROC AUC:** 99.99%
+- **Accuracy:** 99.25%
+- **F1-Score (Macro):** 98.77%
+- **Precision (Crosswalk):** 98.11%
+- **Recall (Crosswalk):** 97.90%
+- **PR AUC:** 99.90%
 
 **Per-Class Accuracy:**
-- **Crosswalk (0):** 99.08%
-- **No-Crosswalk (1):** 99.97%
+- **Crosswalk (0):** 97.90%
+- **No-Crosswalk (1):** 99.56%
 
 ### Visual Diagnostics
 
 <div align="center">
-  <img src="eval/best_model_v1_098.pth/confusion_matrix.png" alt="Confusion Matrix" width="45%">
-  <img src="eval/best_model_v1_098.pth/training_curves.png" alt="Training Curves" width="45%">
+  <img src="eval/best_model/confusion_matrix.png" alt="Confusion Matrix" width="45%">
+  <img src="eval/best_model/training_curves.png" alt="Training Curves" width="45%">
 </div>
 
 ---

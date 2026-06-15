@@ -192,7 +192,7 @@ if __name__ == "__main__":
     
     # Change this to your real dataset path!
     test_root = PROJECT_ROOT / "data" / "asconalocarno"
-    save_aug_dir = PROJECT_ROOT / "img_2"
+    save_aug_dir = PROJECT_ROOT / "tools" / "augmented_img"
     
     if test_root.exists():
         print(f"\n📁 Loading dataset from: {test_root}\n")

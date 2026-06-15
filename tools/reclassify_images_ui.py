@@ -253,16 +253,11 @@ def main():
             
         model.load_state_dict(torch.load(str(checkpoints[-1]), map_location=device))
         
-        train_dataset = CrosswalkDataset(root_dir=str(PROJECT_ROOT / "data" / "train"), augment=False, seed=SEED)
-        test_dataset = CrosswalkDataset(root_dir=str(PROJECT_ROOT / "data" / "test"), augment=False, seed=SEED)
+        dataset = CrosswalkDataset(root_dir=str(PROJECT_ROOT / "data" / "working"), augment=False, seed=SEED)
         
-        print(f"Scanning Train Set ({len(train_dataset)} images)...")
-        train_mismatches = scan_dataset(model, device, train_dataset, verified_set)
+        print(f"Scanning Entire Dataset ({len(dataset)} images)...")
+        review_queue = scan_dataset(model, device, dataset, verified_set)
         
-        print(f"Scanning Test Set ({len(test_dataset)} images)...")
-        test_mismatches = scan_dataset(model, device, test_dataset, verified_set)
-        
-        review_queue = train_mismatches + test_mismatches
         review_queue.sort(key=lambda x: x['confidence'], reverse=True)
         
         with open(QUEUE_FILE, 'w') as f:

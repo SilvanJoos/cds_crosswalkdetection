@@ -1,7 +1,7 @@
 """
-01_data_split.py - Data Preparation: Train/Test Split
+01_data_split.py - Data Preparation: Train/Val/Test Split
 
-This script splits the crosswalk dataset into train and test directories.
+This script splits the crosswalk dataset into train, val, and test directories.
 It assumes your original data is organized in two folders:
   - y/ : images containing crosswalks (positive class)
   - n/ : images without crosswalks (negative class)
@@ -9,6 +9,8 @@ It assumes your original data is organized in two folders:
 Output structure:
   - data/train/y/ : training crosswalk images
   - data/train/n/ : training non-crosswalk images
+  - data/val/y/   : validation crosswalk images
+  - data/val/n/   : validation non-crosswalk images
   - data/test/y/  : testing crosswalk images
   - data/test/n/  : testing non-crosswalk images
 
@@ -19,7 +21,7 @@ import os
 import shutil
 import random
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Dict
 
 
 def set_seed(seed: int = 42) -> None:
@@ -36,16 +38,20 @@ def set_seed(seed: int = 42) -> None:
 def split_dataset(
     data_dir: str,
     output_base_dir: str,
-    train_ratio: float = 0.8,
+    train_ratio: float = 0.7,
+    val_ratio: float = 0.15,
+    test_ratio: float = 0.15,
     seed: int = 42
-) -> Tuple[int, int]:
+) -> Tuple[int, Dict]:
     """
-    Split images from source directories into train/test folders.
+    Split images from source directories into train/val/test folders.
     
     Args:
         data_dir: Path to folder containing 'y' and 'n' subdirectories
-        output_base_dir: Path where 'train' and 'test' directories will be created
-        train_ratio: Proportion of data for training (default: 0.8 for 80/20 split)
+        output_base_dir: Path where 'train', 'val', and 'test' directories will be created
+        train_ratio: Proportion of data for training (default: 0.7)
+        val_ratio: Proportion of data for validation (default: 0.15)
+        test_ratio: Proportion of data for testing (default: 0.15)
         seed: Random seed for reproducibility
         
     Returns:
@@ -56,15 +62,17 @@ def split_dataset(
     # Create output directory structure
     base_path = Path(output_base_dir)
     train_path = base_path / "train"
+    val_path = base_path / "val"
     test_path = base_path / "test"
     
     # Create all required directories
     for class_label in ["y", "n"]:
         (train_path / class_label).mkdir(parents=True, exist_ok=True)
+        (val_path / class_label).mkdir(parents=True, exist_ok=True)
         (test_path / class_label).mkdir(parents=True, exist_ok=True)
     
     print(f"\n📁 Created output directory structure at: {output_base_dir}")
-    print(f"   Train/test split ratio: {train_ratio:.0%} / {1-train_ratio:.0%}\n")
+    print(f"   Train/Val/Test split ratio: {train_ratio:.0%} / {val_ratio:.0%} / {test_ratio:.0%}\n")
     
     # Process each class folder
     total_images = 0
@@ -90,13 +98,20 @@ def split_dataset(
         
         # Shuffle and split
         random.shuffle(image_files)
-        split_idx = int(len(image_files) * train_ratio)
-        train_files = image_files[:split_idx]
-        test_files = image_files[split_idx:]
+        total = len(image_files)
+        train_idx = int(total * train_ratio)
+        val_idx = train_idx + int(total * val_ratio)
+        
+        train_files = image_files[:train_idx]
+        val_files = image_files[train_idx:val_idx]
+        test_files = image_files[val_idx:]
         
         # Copy files to respective directories
         for img_file in train_files:
             shutil.copy2(img_file, train_path / class_label / img_file.name)
+            
+        for img_file in val_files:
+            shutil.copy2(img_file, val_path / class_label / img_file.name)
         
         for img_file in test_files:
             shutil.copy2(img_file, test_path / class_label / img_file.name)
@@ -104,12 +119,13 @@ def split_dataset(
         # Log statistics
         class_name = "Crosswalk (y)" if class_label == "y" else "No Crosswalk (n)"
         print(f"📊 {class_name}:")
-        print(f"   Total: {len(image_files)} | Train: {len(train_files)} | Test: {len(test_files)}")
+        print(f"   Total: {total} | Train: {len(train_files)} | Val: {len(val_files)} | Test: {len(test_files)}")
         
-        total_images += len(image_files)
+        total_images += total
         class_stats[class_label] = {
-            "total": len(image_files),
+            "total": total,
             "train": len(train_files),
+            "val": len(val_files),
             "test": len(test_files)
         }
     
@@ -122,12 +138,15 @@ def print_summary(total_images: int, class_stats: dict) -> None:
     print(f"✅ Dataset Split Complete!")
     print(f"{'='*60}")
     print(f"Total images processed: {total_images}")
-    print(f"Train/Test split: {sum(s['train'] for s in class_stats.values())} / {sum(s['test'] for s in class_stats.values())}")
+    print(f"Train/Val/Test split: {sum(s['train'] for s in class_stats.values())} / {sum(s['val'] for s in class_stats.values())} / {sum(s['test'] for s in class_stats.values())}")
     print(f"\n📁 Directory structure ready for training:")
     print(f"   data/")
     print(f"   ├── train/")
     print(f"   │   ├── y/  ({class_stats.get('y', {}).get('train', 0)} images)")
     print(f"   │   └── n/  ({class_stats.get('n', {}).get('train', 0)} images)")
+    print(f"   ├── val/")
+    print(f"   │   ├── y/  ({class_stats.get('y', {}).get('val', 0)} images)")
+    print(f"   │   └── n/  ({class_stats.get('n', {}).get('val', 0)} images)")
     print(f"   └── test/")
     print(f"       ├── y/  ({class_stats.get('y', {}).get('test', 0)} images)")
     print(f"       └── n/  ({class_stats.get('n', {}).get('test', 0)} images)")
@@ -143,11 +162,13 @@ if __name__ == "__main__":
     # Path to your source data with 'y' and 'n' subdirectories
     SOURCE_DATA_DIR = str(PROJECT_ROOT / "data" / "working")  # Update this to your data location
     
-    # Output directory where train/test split will be created
+    # Output directory where train/val/test split will be created
     OUTPUT_DIR = str(PROJECT_ROOT / "data")
     
-    # Train/test split ratio (80% train, 20% test)
-    TRAIN_TEST_RATIO = 0.8
+    # Train/Val/Test split ratio
+    TRAIN_RATIO = 0.7
+    VAL_RATIO = 0.15
+    TEST_RATIO = 0.15
     
     # Random seed for reproducibility
     RANDOM_SEED = 42
@@ -158,7 +179,9 @@ if __name__ == "__main__":
         total, stats = split_dataset(
             data_dir=SOURCE_DATA_DIR,
             output_base_dir=OUTPUT_DIR,
-            train_ratio=TRAIN_TEST_RATIO,
+            train_ratio=TRAIN_RATIO,
+            val_ratio=VAL_RATIO,
+            test_ratio=TEST_RATIO,
             seed=RANDOM_SEED
         )
         print_summary(total, stats)

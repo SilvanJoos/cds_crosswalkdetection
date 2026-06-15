@@ -13,7 +13,7 @@ from model import create_model, set_seed
 
 def main():
     # ========== CONFIGURATION ==========
-    TEST_DIR = PROJECT_ROOT / "data" / "test"
+    DATA_DIR = PROJECT_ROOT / "data" / "working"
     BATCH_SIZE = 32
     SEED = 42
     # ===================================
@@ -23,16 +23,23 @@ def main():
     print(f"\n🔍 Starting Error Analysis on Device: {device}\n")
     
     try:
-        # 1. Load the Test Dataset (We need the raw dataset object to get the file paths)
-        print("📊 Loading test data...")
-        test_dataset = CrosswalkDataset(
-            root_dir=str(TEST_DIR),
+        # 1. Load the Entire Dataset (We need the raw dataset object to get the file paths)
+        print("📊 Loading data from working directory...")
+        dataset = CrosswalkDataset(
+            root_dir=str(DATA_DIR),
             augment=False,
             seed=SEED
         )
         
-        # 2. Get the test loader (crucially, shuffle=False)
-        _, test_loader = create_dataloaders(str(PROJECT_ROOT / "data" / "train"), str(TEST_DIR), batch_size=BATCH_SIZE, seed=SEED)
+        # 2. Get the loader (crucially, shuffle=False)
+        from torch.utils.data import DataLoader
+        data_loader = DataLoader(
+            dataset,
+            batch_size=BATCH_SIZE,
+            shuffle=False,
+            num_workers=8, # or suitable number
+            pin_memory=True
+        )
         
         # 3. Find and load the best model
         print("\n🏗️  Building and loading model...")
@@ -54,9 +61,9 @@ def main():
         all_probs = []
         all_labels = []
         
-        print("\n🧠 Running inference on the test set...")
+        print("\n🧠 Running inference on the dataset...")
         with torch.no_grad():
-            for images, labels in test_loader:
+            for images, labels in data_loader:
                 images, labels = images.to(device), labels.to(device)
                 logits = model(images)
                 
@@ -71,7 +78,7 @@ def main():
         # 5. Analyze Errors and Write to CSV
         output_csv = PROJECT_ROOT / "eval" / "misclassified_images.csv"
         output_csv.parent.mkdir(parents=True, exist_ok=True)
-        image_paths = test_dataset.images  # Matches exactly because shuffle=False
+        image_paths = dataset.images  # Matches exactly because shuffle=False
         
         error_count = 0
         

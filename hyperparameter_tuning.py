@@ -172,8 +172,8 @@ def main():
     print(f"{'='*70}")
     
     try:
-        train_loader, test_loader = create_dataloaders("./data/train", "./data/test", batch_size=32, seed=SEED)
-        trainer = OptunaTrainer(train_loader, test_loader, device, SEED)
+        train_loader, val_loader = create_dataloaders("./data/train", "./data/val", batch_size=32, seed=SEED)
+        trainer = OptunaTrainer(train_loader, val_loader, device, SEED)
         
         sampler = TPESampler(seed=SEED)
         pruner = MedianPruner()
@@ -207,4 +207,4 @@ def main():
         raise
 
 if __name__ == "__main__":
-    main()
+    main()()

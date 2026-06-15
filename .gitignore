@@ -1,7 +1,8 @@
-# Ignore the data directory (as requested)
-data/
+# Ignore the data directory contents, but keep the folder
+data/*
+!data/.gitkeep
 
-#ignore private folder
+# Ignore private folder completely
 private/
 
 # Ignore Python cache files
@@ -14,9 +15,10 @@ __pycache__/
 # Ignore VS Code workspace settings
 .vscode/
 
-# Ignore model checkpoints (these files are usually very large)
-checkpoints/
-private/
+# Ignore model checkpoints contents, but keep the folder
+checkpoints/*
+!checkpoints/.gitkeep
 
-# Ignore image output directories (if img_2 contains generated/large datasets)
-img_2/
+# Ignore image output directory contents, but keep the folder
+augmented_images/
+!augmented_images/.gitkeep
